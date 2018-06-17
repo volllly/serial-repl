@@ -1,0 +1,28 @@
+{
+  "extends": "eslint-config-standard",
+  "parserOptions": {
+    "ecmaVersion": 2017,
+    "ecmaFeatures": {
+      "impliedStrict": true
+    },
+    "sourceType": "module"
+  },
+  "env": {
+    "node": true
+  },
+  "rules": {
+    "semi": ["warn", "always"],
+    "keyword-spacing": ["error", { 
+      "overrides": {
+        "if": { "after": false },
+        "catch": { "after": false },
+        "for": { "after": false },
+        "while": { "after": false }
+      }
+    }],
+    "space-before-function-paren": ["warn", {
+      "named": "never",
+      "asyncArrow": "always"
+    }]
+  }
+}
