@@ -1,16 +1,17 @@
-const serialport = require('serialport');
+const SerialPort = require('serialport');
 const Delimiter = require('@serialport/parser-delimiter');
-const ByteLength = require('@serialport/parser-byte-length')
-const inquirer = require('inquirer');
-const minimist = require('minimist');
+const ByteLength = require('@serialport/parser-byte-length');
 const Vorpal = require('vorpal');
-const use = require('use-plugin');
 const chalk = require('chalk');
 
-class STR {
+const fs = require('fs');
+const path = require('path');
+
+class SR {
   constructor() {
     this.port = null;
     this.parser = null;
+    this.plugindir = './src/plugins';
 
     this.options = {
       port: undefined,
@@ -41,7 +42,7 @@ class STR {
         let i = cmd.indexOf(' ');
         if(i > 0) {
           this.tx(cmd.slice(i + 1));
-          return cmd; 
+          return cmd;
         }
       })
       .action((cmd, cbk) => {
@@ -54,7 +55,7 @@ class STR {
       .option('-b, --baud-rate <BAUDRATE>')
       .option('-d, --data-bits <BITS>')
       .option('-s, --stop-bits <BITS>')
-      .option('-r, --parity <PARITY>',  ['none', 'even', 'mark', 'odd', 'space'])
+      .option('-r, --parity <PARITY>', ['none', 'even', 'mark', 'odd', 'space'])
       .option('--bytes <BYTES>')
       .option('--delimiter <DELIMITER>')
       .validate((args) => {
@@ -67,19 +68,19 @@ class STR {
         if(args.options['bytes'] && isNaN(Number(args.options['bytes']))) { return chalk.red('bytes has to be a number'); }
       })
       .action((cmd, cbk) => {
-        this.options.port     = cmd.options['port']       || this.options.port;
-        this.options.baudRate = cmd.options['baud-rate']  || this.options.baudRate;
-        this.options.dataBits = cmd.options['data-bits']  || this.options.dataBits;
-        this.options.stopBits = cmd.options['stop-bits']  || this.options.stopBits;
-        this.options.parity   = cmd.options['parity']     || this.options.parity;
+        this.options.port = cmd.options['port'] || this.options.port;
+        this.options.baudRate = cmd.options['baud-rate'] || this.options.baudRate;
+        this.options.dataBits = cmd.options['data-bits'] || this.options.dataBits;
+        this.options.stopBits = cmd.options['stop-bits'] || this.options.stopBits;
+        this.options.parity = cmd.options['parity'] || this.options.parity;
         if(cmd.options['bytes']) {
-          this.options.parse =  {
+          this.options.parse = {
             type: 'bytes',
             option: cmd.options['bytes']
           };
         }
         if(cmd.options['delimiter']) {
-          this.options.parse =  {
+          this.options.parse = {
             type: 'delimiter',
             option: cmd.options['delimiter']
           };
@@ -97,30 +98,40 @@ class STR {
       })
       .action((cmd, cbk) => {
         if(cmd.options['bytes']) {
-          this.options.parse =  {
+          this.options.parse = {
             type: 'bytes',
             option: cmd.options['bytes']
           };
         }
         if(cmd.options['delimiter']) {
-          this.options.parse =  {
+          this.options.parse = {
             type: 'delimiter',
             option: cmd.options['delimiter']
           };
         }
-        this.parser();
+        this.setparser();
         cbk();
       });
-      
+
+    this.plugins = [];
+    for(let d of fs.readdirSync(this.plugindir)) {
+      this.plugins[path.basename(d, '.js')] = new (require(`.${this.plugindir}/${d}`))(this);
+    }
+
     this.vorpal
       .delimiter(this.options.port || 'undefined')
-      .history('serial-terminal-repl.paul.volavsek.com')
+      .history('serial-repl.paul.volavsek.com')
       .show();
   }
 
+  caller(path, args) {
+    for(let p in this.plugins) {
+      this.plugins[p][path](...args);
+    }
+  }
   connect(cbk) {
     let cnt = () => {
-      this.port = new serialport(this.options.port, {
+      this.port = new SerialPort(this.options.port, {
         autoOpen: false,
         baudRate: 115200,
         dataBits: this.options.dataBits,
@@ -143,8 +154,8 @@ class STR {
         this.setparser();
         cbk && cbk();
       });
-    }
-    
+    };
+
     if(this.port) {
       this.port.close((_error) => {
         if(_error) {
@@ -176,6 +187,8 @@ class STR {
   }
 
   tx(msg, cbk) {
+    this.caller('tx', [msg]);
+
     this.port.write(msg, (_error) => {
       if(_error) {
         this.error(_error);
@@ -185,7 +198,11 @@ class STR {
   }
 
   rx(msg) {
-    this.vorpal.log(`${this.options.port} rx ${msg.toString()}${(this.options.parse.type === 'delimiter') ? this.options.parse.option : ''}`);
+    msg = `${msg.toString()}${(this.options.parse.type === 'delimiter') ? this.options.parse.option : ''}`;
+
+    this.caller('rx', [msg]);
+
+    this.vorpal.log(`${this.options.port} rx ${msg}`);
   }
 
   error(error) {
@@ -193,4 +210,4 @@ class STR {
   }
 }
 
-new STR();
+new SR();

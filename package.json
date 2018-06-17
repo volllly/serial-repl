@@ -1,5 +1,5 @@
 {
-  "name": "bel4-ezb-endtask-test",
+  "name": "serial-repl",
   "version": "0.0.0",
   "description": "",
   "main": "./src/main.js",
@@ -13,11 +13,7 @@
     "@serialport/parser-delimiter": "^1.0.5",
     "chalk": "^2.4.1",
     "figlet": "^1.2.0",
-    "inquirer": "^6.0.0",
-    "minimist": "^1.2.0",
     "serialport": "^6.2.0",
-    "use-plugin": "^1.0.2",
-    "vorpal": "^1.12.0",
-    "yargs": "^11.0.0"
+    "vorpal": "^1.12.0"
   }
 }
