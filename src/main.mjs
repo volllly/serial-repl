@@ -1,10 +1,10 @@
-const serialport = require('serialport');
-const Delimiter = require('@serialport/parser-delimiter');
-const inquirer = require('inquirer');
-const minimist = require('minimist');
+import serialport from 'serialport';
+import Delimiter from '@serialport/parser-delimiter';
+import inquirer from 'inquirer';
+import minimist from 'minimist';
 
 
-var argv = minimist(process.argv.slice(2));
+const argv = minimist(process.argv.slice(2));
 
 const port = new serialport(argv._[0], {
   baudRate: 115200,

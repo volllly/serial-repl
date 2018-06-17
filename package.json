@@ -2,16 +2,18 @@
   "name": "bel4-ezb-endtask-test",
   "version": "0.0.0",
   "description": "",
-  "main": "./src/main.js",
+  "main": "./src/main.mjs",
   "scripts": {
-    "start": "node src/main.js"
+    "start": "node --experimental-modules --no-warnings src/main.mjs"
   },
   "author": "paul volavsek",
   "license": "UNLICENSED",
   "dependencies": {
     "@serialport/parser-delimiter": "^1.0.5",
-    "serialport": "^6.2.0",
+    "figlet": "^1.2.0",
     "inquirer": "^6.0.0",
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "serialport": "^6.2.0",
+    "vorpal": "^1.12.0"
   }
 }
