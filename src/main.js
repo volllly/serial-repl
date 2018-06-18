@@ -6,20 +6,59 @@ const chalk = require('chalk');
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 class SR {
   constructor() {
     this.port = null;
     this.parser = null;
-    this.plugindir = './src/plugins';
+    const plugindir = './src/plugins';
+
+    let configreduce = (a, d) => {
+      if(d === '.serialreplrc' ||
+          d === '.serialreplrc.json' ||
+          d === '.serialreplrc.js') {
+        if(d !== '.serialreplrc') {
+          if(a === '.serialreplrc' ||
+          !a) {
+            a = d;
+          }
+        } else {
+          if(!a) {
+            a = d;
+          }
+        }
+      }
+      return a;
+    };
+    console.log(process.cwd());
+    let configpaths = {
+      local: fs.readdirSync(process.cwd()).reduce(configreduce, null),
+      user: fs.readdirSync(os.homedir()).reduce(configreduce, null)
+    };
+
+    if(configpaths.user) {
+      configpaths.user = path.join(os.homedir(), configpaths.user);
+      this.config = (!configpaths.user.endsWith('.js')) ? JSON.parse(configpaths.user) : require(configpaths.user);
+    }
+    if(configpaths.local) {
+      configpaths.local = path.join(process.cwd(), configpaths.local);
+      let config = (!configpaths.local.endsWith('.js')) ? JSON.parse(configpaths.local) : require(configpaths.local);
+      this.config = {
+        options: Object.assign(this.config.options, config.options),
+        rx: Object.assign(this.config.rx || {}, config.rx || {}),
+        tx: Object.assign(this.config.tx || {}, config.tx || {}),
+        plugins: Object.assign(this.config.plugins || {}, config.plugins || {})
+      }
+    }
 
     this.options = {
-      port: undefined,
-      baudRate: 9600,
-      dataBits: 8,
-      stopBits: 1,
-      parity: 'none',
-      parse: {
+      port: this.config.options.port || undefined,
+      baudRate: this.config.options.baudRate || 9600,
+      dataBits: this.config.options.dataBits || 8,
+      stopBits: this.config.options.stopBits || 1,
+      parity: this.config.options.parity || 'none',
+      parse: this.config.options.parse || {
         type: 'bytes',
         option: 1
       }
@@ -114,19 +153,24 @@ class SR {
       });
 
     this.plugins = [];
-    for(let d of fs.readdirSync(this.plugindir)) {
-      this.plugins[path.basename(d, '.js')] = new (require(`.${this.plugindir}/${d}`))(this);
+    for(let d of fs.readdirSync(plugindir)) {
+      let name = path.basename(d, '.js');
+      this.plugins[name] = new (require(`.${plugindir}/${d}`))(this, this.config.plugins[name] || {});
     }
 
     this.vorpal
-      .delimiter(this.options.port || 'undefined')
+      .delimiter('undefined')
       .history('serial-repl.paul.volavsek.com')
       .show();
   }
 
   caller(path, args) {
     for(let p in this.plugins) {
-      this.plugins[p][path](...args);
+      let a = args;
+      if(this.config[path][p]) {
+        a = this.config[path][p](...a);
+      }
+      this.plugins[p][path](...a);
     }
   }
   connect(cbk) {
@@ -147,8 +191,6 @@ class SR {
       this.port.open((_error) => {
         if(_error) {
           this.error(_error);
-          cbk && cbk();
-          return;
         }
         this.vorpal.delimiter(this.options.port);
         this.setparser();
@@ -156,12 +198,15 @@ class SR {
       });
     };
 
+    if(!this.options.port) {
+      cbk && cbk();
+      return;
+    }
+
     if(this.port) {
       this.port.close((_error) => {
         if(_error) {
           this.error(_error);
-          cbk && cbk();
-          return;
         }
         cnt();
       });
@@ -187,6 +232,7 @@ class SR {
   }
 
   tx(msg, cbk) {
+    if(this.config.tx.main) { msg = this.config.tx.main(msg); }
     this.caller('tx', [msg]);
 
     this.port.write(msg, (_error) => {
@@ -200,9 +246,10 @@ class SR {
   rx(msg) {
     msg = `${msg.toString()}${(this.options.parse.type === 'delimiter') ? this.options.parse.option : ''}`;
 
+    if(this.config.tx.main) { msg = this.config.tx.main(msg); }
     this.caller('rx', [msg]);
 
-    this.vorpal.log(`${this.options.port} rx ${msg}`);
+    this.vorpal.log(`${this.options.port} ${chalk.cyan(`rx ${msg}`)}`);
   }
 
   error(error) {
