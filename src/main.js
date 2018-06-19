@@ -12,7 +12,8 @@ class SR {
   constructor() {
     this.port = null;
     this.parser = null;
-    const plugindir = './src/plugins';
+    this.plugindir = './src/plugins';
+    this.pluginprefix = 'serial-repl-';
 
     let configreduce = (a, d) => {
       if(d === '.serialreplrc' ||
@@ -49,7 +50,7 @@ class SR {
         rx: Object.assign(this.config.rx || {}, config.rx || {}),
         tx: Object.assign(this.config.tx || {}, config.tx || {}),
         plugins: Object.assign(this.config.plugins || {}, config.plugins || {})
-      }
+      };
     }
 
     this.options = {
@@ -68,12 +69,14 @@ class SR {
 
     this.vorpal
       .mode('repl', 'enter a repl mode where everything is sent.')
-      .delimiter('>')
+      .delimiter('repl')
       .init((args, cbk) => {
         this.vorpal.log('type `exit` to exit repl mode');
         cbk();
       })
-      .action(this.tx);
+      .action((cmd, cbk) => {
+        this.tx(cmd, cbk);
+      });
 
     this.vorpal
       .command('tx [message...]', 'send a string.')
@@ -153,10 +156,18 @@ class SR {
       });
 
     this.plugins = [];
-    for(let d of fs.readdirSync(plugindir)) {
-      let name = path.basename(d, '.js');
-      this.plugins[name] = new (require(`.${plugindir}/${d}`))(this, this.config.plugins[name] || {});
+    for(let p in this.config.plugins) {
+      let name = `${this.pluginprefix}${p}`;
+      if(fs.existsSync(`${this.plugindir}/${this.pluginprefix}${p}.js`)) {
+        this.plugins[name] = new (require(`.${this.plugindir}/${this.pluginprefix}${p}.js`))(this, this.config.plugins[name.slice(this.pluginprefix.length)] || {});
+      } else {
+        //Error
+      }
     }
+    /* for(let d of fs.readdirSync(this.plugindir)) {
+      let name = path.basename(d, '.js');
+      this.plugins[name] = new (require(`.${this.plugindir}/${d}`))(this, this.config.plugins[name.slice(this.pluginprefix.length)] || {});
+    } */
 
     this.vorpal
       .delimiter('undefined')
@@ -165,13 +176,14 @@ class SR {
   }
 
   caller(path, args) {
+    let a = args;
     for(let p in this.plugins) {
-      let a = args;
-      if(this.config[path][p]) {
-        a = this.config[path][p](...a);
+      if(this.config[path][p.slice(this.pluginprefix.length)]) {
+        a = this.config[path][p](...a) || args;
       }
-      this.plugins[p][path](...a);
+      a = this.plugins[p][path](...a) || args;
     }
+    return a;
   }
   connect(cbk) {
     let cnt = () => {
@@ -233,7 +245,7 @@ class SR {
 
   tx(msg, cbk) {
     if(this.config.tx.main) { msg = this.config.tx.main(msg); }
-    this.caller('tx', [msg]);
+    [msg] = this.caller('tx', [msg]) || [msg];
 
     this.port.write(msg, (_error) => {
       if(_error) {
@@ -246,8 +258,8 @@ class SR {
   rx(msg) {
     msg = `${msg.toString()}${(this.options.parse.type === 'delimiter') ? this.options.parse.option : ''}`;
 
-    if(this.config.tx.main) { msg = this.config.tx.main(msg); }
-    this.caller('rx', [msg]);
+    if(this.config.rx.main) { msg = this.config.rx.main(msg); }
+    [msg] = this.caller('rx', [msg]) || [msg];
 
     this.vorpal.log(`${this.options.port} ${chalk.cyan(`rx ${msg}`)}`);
   }
@@ -257,4 +269,6 @@ class SR {
   }
 }
 
+/* eslint-disable no-new */
 new SR();
+/* eslint-enable no-new */

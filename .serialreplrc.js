@@ -16,12 +16,19 @@ module.exports = {
     }
   },
   plugins: {
-    'serial-repl-autoack': {
+    autoack: {
       enabled: true,
-      ack: '#ACK$',
+      ack: 'ACK',
       if: (msg) => {
-        return msg === '#DO$';
+        return msg[1] === 'M' || msg[1] === 'L' || msg[1] === 'C';
       }
+    },
+    ptk: {
+      enabled: true,
+      start: '#',
+      separator: ':',
+      end: '$',
+      number: '%'
     }
   }
 }

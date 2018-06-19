@@ -13,6 +13,7 @@
     "@serialport/parser-delimiter": "^1.0.5",
     "chalk": "^2.4.1",
     "figlet": "^1.2.0",
+    "minimist": "^1.2.0",
     "serialport": "^6.2.0",
     "vorpal": "^1.12.0"
   }
