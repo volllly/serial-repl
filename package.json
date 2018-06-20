@@ -6,7 +6,15 @@
   "scripts": {
     "start": "node src/main.js"
   },
+  "bin": {
+    "serial-repl": ".src/main.js"
+  },
   "author": "paul volavsek",
+  "homepage": "http://paul.volavsek.com",
+  "repository" : {
+    "type" : "git",
+    "url" : "github:volllly/serial-repl"
+  },
   "license": "UNLICENSED",
   "dependencies": {
     "@serialport/parser-byte-length": "^1.0.5",

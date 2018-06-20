@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const SerialPort = require('serialport');
 const Delimiter = require('@serialport/parser-delimiter');
 const ByteLength = require('@serialport/parser-byte-length');
