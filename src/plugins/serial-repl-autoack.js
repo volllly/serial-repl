@@ -14,7 +14,6 @@ module.exports = class {
       .option('-l, --last', 'send for the previous command')
       .validate((args) => {
         if(args.ENABLED !== 'enabled' && args.ENABLED !== 'disabled') { return chalk.red('argument 1 must be enabled or disabled'); }
-        if(args.ENABLED === 'enabled' && !args.ACK) { return chalk.red('argument 2 must be set if enabled'); }
       })
       .action((cmd, cbk) => {
         this.enabled = cmd.ENABLED === 'enabled';
@@ -40,9 +39,5 @@ module.exports = class {
     }
 
     this.self.tx(this.ack);
-  }
-
-  tx(msg) {
-
   }
 };

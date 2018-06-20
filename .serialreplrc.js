@@ -1,6 +1,5 @@
 module.exports = {
   options: {
-    port: 'COM3',
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,
@@ -16,12 +15,8 @@ module.exports = {
         enabled: true,
         ack: 'ACK',
         if: (msg) => {
-          return msg[1] === 'M' || msg[1] === 'L' || msg[1] === 'C';
+          return ['M', 'L', 'C'].includes(msg[0]);
         }
-      },
-      order: {
-        tx: 1,
-        rx: 1
       }
     },
     ptk: {

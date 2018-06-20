@@ -11,7 +11,7 @@
     "node": true
   },
   "rules": {
-    "semi": ["warn", "always"],
+    "semi": ["error", "always"],
     "keyword-spacing": ["error", { 
       "overrides": {
         "if": { "after": false },
@@ -21,7 +21,7 @@
         "while": { "after": false }
       }
     }],
-    "space-before-function-paren": ["warn", {
+    "space-before-function-paren": ["error", {
       "named": "never",
       "asyncArrow": "always"
     }]

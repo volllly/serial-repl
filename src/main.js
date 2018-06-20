@@ -33,7 +33,6 @@ class SR {
       }
       return a;
     };
-    console.log(process.cwd());
     let configpaths = {
       local: fs.readdirSync(process.cwd()).reduce(configreduce, null),
       user: fs.readdirSync(os.homedir()).reduce(configreduce, null)
@@ -188,13 +187,14 @@ class SR {
   }
 
   caller(path, args) {
-    let a = args;
-    let callorder = []
+    let callorder = [];
     let docall = (plugin) => {
       if(this.config[path] && this.config[path][plugin.slice(this.pluginprefix.length)]) {
-        a = this.config[path][plugin](...a) || args;
+        args = this.config[path][plugin](...args) || args;
       }
-      a = this.plugins[plugin][path](...a) || args;
+      if(this.plugins[plugin][path]) {
+        args = this.plugins[plugin][path](...args) || args;
+      }
     };
     for(let i in Object.keys(this.pluginorder[path]).filter((i) => !isNaN(i)).sort((a, b) => {
       if(Number(a) > Number(b)) { return 1; }
@@ -206,10 +206,9 @@ class SR {
     }
     callorder.push(...this.pluginorder[path].last);
     for(let p of callorder) {
-      console.log(p);
       docall(p);
     }
-    return a;
+    return args;
   }
   connect(cbk) {
     let cnt = () => {
@@ -301,7 +300,7 @@ class SR {
   }
 
   error(error) {
-    this.vorpal.log(chalk.red(`error: ${error}`));
+    this.vorpal.log(chalk.red(error));
   }
 }
 
