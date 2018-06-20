@@ -3,6 +3,7 @@ const Delimiter = require('@serialport/parser-delimiter');
 const ByteLength = require('@serialport/parser-byte-length');
 const Vorpal = require('vorpal');
 const chalk = require('chalk');
+const merge = require('assign-deeply');
 
 const fs = require('fs');
 const path = require('path');
@@ -45,12 +46,8 @@ class SR {
     if(configpaths.local) {
       configpaths.local = path.join(process.cwd(), configpaths.local);
       let config = (!configpaths.local.endsWith('.js')) ? JSON.parse(configpaths.local) : require(configpaths.local);
-      this.config = {
-        options: Object.assign(this.config.options, config.options),
-        rx: Object.assign(this.config.rx || {}, config.rx || {}),
-        tx: Object.assign(this.config.tx || {}, config.tx || {}),
-        plugins: Object.assign(this.config.plugins || {}, config.plugins || {})
-      };
+
+      this.config = merge(this.config, config);
     }
 
     this.options = {
@@ -156,18 +153,33 @@ class SR {
       });
 
     this.plugins = [];
+    this.pluginorder = {
+      tx: {
+        last: []
+      },
+      rx: {
+        last: []
+      }
+    };
+    let unfoundplugins = [];
     for(let p in this.config.plugins) {
       let name = `${this.pluginprefix}${p}`;
       if(fs.existsSync(`${this.plugindir}/${this.pluginprefix}${p}.js`)) {
-        this.plugins[name] = new (require(`.${this.plugindir}/${this.pluginprefix}${p}.js`))(this, this.config.plugins[name.slice(this.pluginprefix.length)] || {});
+        this.plugins[name] = new (require(`.${this.plugindir}/${this.pluginprefix}${p}.js`))(this, this.config.plugins[name.slice(this.pluginprefix.length)].config || {});
+        if(this.config.plugins[name.slice(this.pluginprefix.length)].order) {
+          if(!this.pluginorder.tx[this.config.plugins[name.slice(this.pluginprefix.length)].order.tx]) { this.pluginorder.tx[this.config.plugins[name.slice(this.pluginprefix.length)].order.tx] = name; }
+          if(!this.pluginorder.rx[this.config.plugins[name.slice(this.pluginprefix.length)].order.rx]) { this.pluginorder.rx[this.config.plugins[name.slice(this.pluginprefix.length)].order.rx] = name; }
+          continue;
+        }
+        this.pluginorder.tx.last.push(name);
+        this.pluginorder.rx.last.push(name);
       } else {
-        //Error
+        unfoundplugins.push(p);
       }
     }
-    /* for(let d of fs.readdirSync(this.plugindir)) {
-      let name = path.basename(d, '.js');
-      this.plugins[name] = new (require(`.${this.plugindir}/${d}`))(this, this.config.plugins[name.slice(this.pluginprefix.length)] || {});
-    } */
+    for(let p of unfoundplugins) {
+      this.error(`plugin "${p}" not found`);
+    }
 
     this.vorpal
       .delimiter('undefined')
@@ -177,11 +189,25 @@ class SR {
 
   caller(path, args) {
     let a = args;
-    for(let p in this.plugins) {
-      if(this.config[path][p.slice(this.pluginprefix.length)]) {
-        a = this.config[path][p](...a) || args;
+    let callorder = []
+    let docall = (plugin) => {
+      if(this.config[path] && this.config[path][plugin.slice(this.pluginprefix.length)]) {
+        a = this.config[path][plugin](...a) || args;
       }
-      a = this.plugins[p][path](...a) || args;
+      a = this.plugins[plugin][path](...a) || args;
+    };
+    for(let i in Object.keys(this.pluginorder[path]).filter((i) => !isNaN(i)).sort((a, b) => {
+      if(Number(a) > Number(b)) { return 1; }
+      if(Number(a) < Number(b)) { return -1; }
+      return 0;
+    })) {
+      if(!i) { continue; }
+      callorder.push(this.pluginorder[path][i]);
+    }
+    callorder.push(...this.pluginorder[path].last);
+    for(let p of callorder) {
+      console.log(p);
+      docall(p);
     }
     return a;
   }
@@ -202,7 +228,11 @@ class SR {
 
       this.port.open((_error) => {
         if(_error) {
+          this.port = null;
           this.error(_error);
+          this.vorpal.delimiter('undefined');
+          cbk && cbk();
+          return;
         }
         this.vorpal.delimiter(this.options.port);
         this.setparser();
@@ -218,6 +248,7 @@ class SR {
     if(this.port) {
       this.port.close((_error) => {
         if(_error) {
+          this.port = null;
           this.error(_error);
         }
         cnt();
@@ -228,6 +259,10 @@ class SR {
   }
 
   setparser() {
+    if(!this.port) {
+      this.error('serialport not connected');
+      return;
+    }
     switch(this.options.parse.type) {
       case 'bytes':
         this.parser = this.port.pipe(new ByteLength({ length: this.options.parse.option }));
@@ -239,13 +274,14 @@ class SR {
     this.parser.on('data', (msg) => { this.rx(msg); });
   }
 
-  loaded() {
-
-  }
-
   tx(msg, cbk) {
-    if(this.config.tx.main) { msg = this.config.tx.main(msg); }
+    if(this.config.tx && this.config.tx.main) { msg = this.config.tx.main(msg); }
     [msg] = this.caller('tx', [msg]) || [msg];
+
+    if(!this.port) {
+      this.error('serialport not connected');
+      return;
+    }
 
     this.port.write(msg, (_error) => {
       if(_error) {
@@ -258,7 +294,7 @@ class SR {
   rx(msg) {
     msg = `${msg.toString()}${(this.options.parse.type === 'delimiter') ? this.options.parse.option : ''}`;
 
-    if(this.config.rx.main) { msg = this.config.rx.main(msg); }
+    if(this.config.rx && this.config.rx.main) { msg = this.config.rx.main(msg); }
     [msg] = this.caller('rx', [msg]) || [msg];
 
     this.vorpal.log(`${this.options.port} ${chalk.cyan(`rx ${msg}`)}`);
