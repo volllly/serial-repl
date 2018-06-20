@@ -7,7 +7,7 @@
     "start": "node src/main.js"
   },
   "bin": {
-    "serial-repl": ".src/main.js"
+    "serial-repl": "src/main.js"
   },
   "author": "paul volavsek",
   "homepage": "http://paul.volavsek.com",
