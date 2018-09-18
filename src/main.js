@@ -89,7 +89,11 @@ class SR {
       });
 
     this.vorpal
-      .command('connect', 'send a string.')
+      .command('list', 'list all COM ports.')
+      .action((cmd, cbk) => { this.list(cbk); });
+
+    this.vorpal
+      .command('connect', 'connect to COM port.')
       .option('-p, --port <PORT>')
       .option('-b, --baud-rate <BAUDRATE>')
       .option('-d, --data-bits <BITS>')
@@ -210,6 +214,22 @@ class SR {
       docall(p);
     }
     return args;
+  }
+  list(cbk) {
+    SerialPort.list((_error, _results) => {
+      if(_error) {
+        this.error(_error);
+      } else {
+        if(!_results) {
+          this.error('no COM ports were found');
+        } else {
+          for(let l of _results) {
+            this.vorpal.log(l.comName);
+          }
+        }
+      }
+      cbk();
+    });
   }
   connect(cbk) {
     let cnt = () => {
